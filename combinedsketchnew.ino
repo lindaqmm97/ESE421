@@ -61,6 +61,7 @@ void setup() {
 
 void loop() {
   // put your main code here, to run repeatedly:
+  int tau=4;
   static unsigned long timer = millis();
   motorPWMCurrent=motorPWM;
   getPingDistanceCM();
@@ -76,9 +77,10 @@ void loop() {
   if(g.gyro.z>10 ||g.gyro.z<-10){
   heading_est_degrees -= (g.gyro.z)*(.001*timeRead);
   static float newAngle=0;
-  newAngle+=(.001*timeRead)/10*(gpsPsi-heading_est_degrees-newAngle);
-  float servoAngle = servoAngleDeg-k_heading * newAngle; 
-  Serial.println(g.gyro.z);  
+  newAngle+=(.001*timeRead)/tau*(gpsPsi-heading_est_degrees-newAngle);
+  float psiEstimated=newAngle+heading_est_degrees;
+  float servoAngle = servoAngleDeg-k_heading * psiEstimated; 
+//  Serial.println(g.gyro.z);  
   steeringServo.write(constrain(servoAngle,servoAngleDeg-30, servoAngleDeg+30)); }
   while(millis()-timer<20){
   }
