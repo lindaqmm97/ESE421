@@ -1,0 +1,21 @@
+import os
+import pandas as pd
+import numpy as np
+
+Location = r'/Users/lin/Desktop/mapPennParkEdges.txt'
+df=pd.read_csv(Location)
+
+Location1 = r'/Users/lin/Desktop/mapPennParkNodes.txt'
+df2=pd.read_csv(Location1)
+
+latitude = input("GPS latitude")
+longitude = input ("GPS longitude")
+speed = input ("GPS speed")
+
+distance=-1
+length=len(df2)
+for i in range(0,length)
+	for j in range(i+1,length)
+		if latitude < df2.iloc[i,1] && latitude > df2.iloc[j,1]:
+			if longitude < df2.iloc[i,2] && longitude > df2.iloc[j,2]:
+				distance=
