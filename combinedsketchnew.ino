@@ -27,14 +27,20 @@ float pingDistanceCM = 0.0;
 //byte gyroZBias=0;
 //byte servoBias=0;
 float timeRead=20;
-float  k_heading =1.5;
+float k_heading =1.5;
+//float GPS_sub=0;
+float gpsPsi;
+float servoAngle=90;
 //float GPSangle;
 
 void setup() {
   // put your setup code here, to run once:
     Serial.begin(115200);
-    HardwareSerial mySerial = Serial1;
-    Adafruit_GPS GPS(&Serial1);
+    OCR0A = 0xAF;
+    TIMSK0 |= _BV(OCIE0A);
+    GPS.begin(9600);
+    GPS.sendCommand(PMTK_SET_NMEA_OUTPUT_RMCONLY); // minimum information only
+    GPS.sendCommand(PMTK_SET_NMEA_UPDATE_1HZ);   // 1 Hz update rate
     pinMode(motorPin,OUTPUT);
     analogWrite(motorPin,0);
     pinMode(pingGrndPin,OUTPUT); digitalWrite(pingGrndPin,LOW);
@@ -47,23 +53,18 @@ void setup() {
     steeringServo.write(servoAngleDeg);
 //  read bias by taking the average of 10 gyro.z readings  
     lsm.begin();
-    OCR0A = 0xAF;
-    TIMSK0 |= _BV(OCIE0A);
-    GPS.begin(9600);
-    GPS.sendCommand(PMTK_SET_NMEA_OUTPUT_RMCONLY);
-    GPS.sendCommand(PMTK_SET_NMEA_UPDATE_1HZ); 
 
 }
 
-    SIGNAL(TIMER0_COMPA_vect) {
-    char c = GPS.read();
+SIGNAL(TIMER0_COMPA_vect) {
+   char c = GPS.read();
 }
 
 void loop() {
   // put your main code here, to run repeatedly:
   int tau=4;
   static unsigned long timer = millis();
-  double desiredPsi=28;
+  double desiredPsi=10;
   motorPWMCurrent=motorPWM;
   getPingDistanceCM();
   if(pingDistanceCM<=30.0){
@@ -71,21 +72,43 @@ void loop() {
   } 
   analogWrite(motorPin,motorPWMCurrent);
   lsm.read();  /* ask it to read in the data */
-  float gpsPsi = GPS.angle;
+  if (GPS.parse(GPS.lastNMEA())){
+//    if(GPS.speed>0.5){
+      gpsPsi = GPS.angle;}
+//  }
+//  Serial.println(gpsPsi);
+
   sensors_event_t a, m, g, temp;
   lsm.getEvent(&a, &m, &g, &temp);
   static float heading_est_degrees = 0;
-  if(g.gyro.z>10 ||g.gyro.z<-10){
-  heading_est_degrees -= (g.gyro.z)*(.001*timeRead);
-  static float newAngle=0;
-  newAngle+=(.001*timeRead)/tau*(gpsPsi-heading_est_degrees-newAngle);
-  float psiEstimated=newAngle+heading_est_degrees;
-  float servoAngle = servoAngleDeg-k_heading * (desiredPsi-psiEstimated); 
-//  Serial.println(g.gyro.z);  
-  steeringServo.write(constrain(servoAngle,servoAngleDeg-30, servoAngleDeg+30)); }
+  float partial_sub=gpsPsi-heading_est_degrees;
+//  Serial.println(partial_sub);
+//  if(partial_sub<-180){
+//    partial_sub+=360;
+//  }
+//  else if(partial_sub>180){
+//    partial_sub-=360;
+//  }
+  heading_est_degrees+=(.001*timeRead)/tau*(gpsPsi-heading_est_degrees)+(.001*timeRead)*g.gyro.z;
+//  Serial.println(heading_est_degrees);
+  float angle_sub=desiredPsi-heading_est_degrees;
+//  Serial.println(angle_sub);
+  if(desiredPsi-heading_est_degrees<-180){
+    angle_sub=360+angle_sub;
+  }
+  else if(desiredPsi-heading_est_degrees>180){
+    angle_sub=angle_sub-360;
+  }  
+  servoAngle = servoAngleDeg-k_heading * angle_sub; 
+  
+  Serial.println(angle_sub);
+  Serial.println(GPS.angle);
+  Serial.println("---");  
+  steeringServo.write(constrain(servoAngle,servoAngleDeg-30, servoAngleDeg+30)); 
   while(millis()-timer<20){
   }
   timer=millis();
+  
 //  delay(15);
 }
 
