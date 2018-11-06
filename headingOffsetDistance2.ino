@@ -88,7 +88,7 @@ void loop() {
   static float heading_est_degrees = 0;
   heading_est_degrees = (lowFHeading + tau * highFDotHeading - heading_est_degrees) / tau * (.001 * timeRead);
   
-  //second part heading
+  //second part offset from road
   //newly added, read from map or image
   float widthmap = 2;
   float widthcamera = 0.2;
