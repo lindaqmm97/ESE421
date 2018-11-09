@@ -13,7 +13,7 @@ camera.resolution = (16*photoHeight/9, photoHeight)
 # captue an image and read it back in
 # (Do this because picamera does not play nice with openCV?)
 #
-#camera.capture('blackRoad2.jpg')
+camera.capture('blackRoad1.jpg')
 imgColor = cv2.imread('blackRoad1.jpg') 
 #
 # convert to grayscale -- this seems to be standard for edge detection
@@ -106,7 +106,7 @@ if MaxY2right!=MaxY1right:
     steeringAngleRight= (((MaxX2right-MaxX1right)/(MaxY2right-MaxY1right)*height/2+(MaxX1right*MaxY2right-MaxX2right*MaxY1right)/(MaxY2right-MaxY1right)-width/2)/3779.52/f-43.2)/2.337
 else:
     xright=100000
-    steeringAngleRight=np.pi/2
+    steeringAngleRight=90
 print(xright)
 print(steeringAngleRight)
 
@@ -120,7 +120,7 @@ if MaxY2left!=MaxY1left:
     steeringAngleLeft= ((MaxX1left*MaxY2left-MaxX2left*MaxY1left)/(MaxY2left-MaxY1left)/3779.52/f-43.2)/2.337
 else:
     xleft=10000
-    steeringAngleLeft=np.pi/2
+    steeringAngleLeft=90
 print(xleft)
 print(steeringAngleLeft)
 
