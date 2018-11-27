@@ -56,6 +56,9 @@ String offset;
 
 void setup() {
   // put your setup code here, to run once:
+    Wire.begin(SLAVE_ADDRESS);
+    Wire.onReceive(receiveDataI2C);
+    Wire.onRequest(sendDataI2C);
     Serial.begin(115200);
     OCR0A = 0xAF;
     TIMSK0 |= _BV(OCIE0A);
@@ -75,11 +78,7 @@ void setup() {
     
 //  read bias by taking the average of 10 gyro.z readings  
     lsm.begin();
-    Wire.begin(SLAVE_ADDRESS);
-    Wire.onReceive(receiveDataI2C);
-    Wire.onRequest(sendDataI2C);
 
-    Serial.begin(115200);
 }
 
 SIGNAL(TIMER0_COMPA_vect) {
