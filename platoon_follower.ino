@@ -37,18 +37,15 @@ byte offsetimage = 0;
 float timeRead=20; //[ms]
 float frontEndL = 0.15; //m
 int k_d = 0.5; //[s], converts leader speed to desired following distance, test this
-int k_ed = 0.7;
-int k_off = 0.7;
-int k_beta = 0.7
-//float headingconstant = 0.1;
-
+int k_ed = 0.7; //distance error control
+int k_off = 0.7; //offset control
+int k_beta = 0.7  //beta control
 
 //motor contants
-float pwm0 = 150/255; //experimentally determine pwm0 for DC 
+float pwm0 = 100/255; //experimentally determine pwm0 for DC 
 float v_max = 50; //maximum safe velocity for car, [cm/s]
-float c_accel = 30; //acceleration-to-PWM conversion, experiments needed [s], positive
-float c_p = 1/70; //DC motor constant, must be experimentally determined, [(m/s)/(PWM%)]
-float k_delta = -v_max/90; // [(m/s)/degree] ...no penalty at zero turn angle, max penalty at 90 degree turn
+float c_p = 1/7; //DC motor constant, must be experimentally determined, [(cm/s)/(PWM%)]
+float k_delta = -v_max/90; // [(cm/s)/degree] ...no penalty at zero turn angle, max penalty at 90 degree turn
 float estimatedV = 0;
 
 //I2C
@@ -56,13 +53,11 @@ byte piCommand;
 String value;
 String offset;
 
-
+/////////////////////////////////////////////////////////////
 void setup() {
     Serial.begin(115200);
     Serial.println("PlatoonFollowerCar");  
-//
 // IMU
-//
   if (!lsm.begin())
   {
     Serial.println("Oops ... unable to initialize the LSM9DS1. Check your wiring!");
@@ -73,9 +68,7 @@ void setup() {
   lsm.setupMag(lsm.LSM9DS1_MAGGAIN_4GAUSS);
   lsm.setupGyro(lsm.LSM9DS1_GYROSCALE_245DPS);
 
-//
 //  set up SD card data log
-//
     if (!SD.begin(sdSelectPin)) {
         Serial.println("SD Card fail");
         while(1);
@@ -117,29 +110,26 @@ void loop() {
 //use ping to find distance
   // establish variables for duration of the ping, and the distance result
   // in inches and centimeters:
-  long duration, inches, cm;
-
-    // The PING))) is triggered by a HIGH pulse of 2 or more microseconds.
-    // Give a short LOW pulse beforehand to ensure a clean HIGH pulse:
-    pinMode(pingPin, OUTPUT);
-    digitalWrite(pingPin, LOW);
-    delayMicroseconds(2);
-    digitalWrite(pingPin, HIGH);
-    delayMicroseconds(5);
-    digitalWrite(pingPin, LOW);
-
-    // The same pin is used to read the signal from the PING))): a HIGH pulse
-    // whose duration is the time (in microseconds) from the sending of the ping
-    // to the reception of its echo off of an object.
-    pinMode(pingPin, INPUT);
-    duration = pulseIn(pingPin, HIGH);
-
-    // convert the time into a distance
-    float cmnew = microsecondsToCentimeters(duration);
+  long duration, cm;
+  // The PING))) is triggered by a HIGH pulse of 2 or more microseconds.
+  // Give a short LOW pulse beforehand to ensure a clean HIGH pulse:
+  pinMode(pingPin, OUTPUT);
+  digitalWrite(pingPin, LOW);
+  delayMicroseconds(2);
+  digitalWrite(pingPin, HIGH);
+  delayMicroseconds(5);
+  digitalWrite(pingPin, LOW);
+  // The same pin is used to read the signal from the PING))): a HIGH pulse
+  // whose duration is the time (in microseconds) from the sending of the ping
+  // to the reception of its echo off of an object.
+  pinMode(pingPin, INPUT);
+  duration = pulseIn(pingPin, HIGH);
+  // convert the time into a distance
+  float cmnew = microsecondsToCentimeters(duration);
   
-  //use current estimated speed, timestep, and  distance difference to estimate leader speed
-    float leaderV = estimatedV+(cmnew-cmold)/timeRead;
-    float distdes = k_d*leaderV; //scale factor for desired distance, *s, 50cm/s gives desired distance of 25cm
+//use current estimated speed, timestep, and  distance difference to estimate leader speed
+  float leaderV = estimatedV+(cmnew-cmold)/timeRead;
+  float distdes = k_d*leaderV; //scale factor for desired distance, *s, 50cm/s gives desired distance of 25cm
   
   //command motor to fix distancing, convert to PWM, estimate current velocity from that
     float commandedV = estimatedV + (distdes - cmnew)*k_ed
@@ -161,13 +151,11 @@ void loop() {
   Serial.print(servoAngleDeg); Serial.print(" ");
   
   Serial.println();
-//
-//  reading the RC commands will cause effective pause of 20+ ms
-//  so we don't really need a pause here...
-//
-    delay(1);
+  delay(100); //how much delay?
 }
 
+
+///////////////////////////////////////
 void receiveDataI2C(int nPoints) {
       piCommand = Wire.read();
       //
@@ -214,6 +202,7 @@ void receiveDataI2C(int nPoints) {
       while (Wire.available()) {Wire.read();}
 }
 
+/////////////////////////////////////////////////////
 void sendDataI2C(void) {
     if (piCommand == 1) {
         float dataBuffer[3];
@@ -225,6 +214,7 @@ void sendDataI2C(void) {
 
 }
 
+//////////////////////////////////////////////////////
 long microsecondsToCentimeters(long microseconds) {
   // The speed of sound is 340 m/s or 29 microseconds per centimeter.
   // The ping travels out and back, so to find the distance of the object we
