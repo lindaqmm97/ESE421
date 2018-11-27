@@ -131,27 +131,28 @@ void loop() {
   float leaderV = estimatedV+(cmnew-cmold)/timeRead;
   float distdes = k_d*leaderV; //scale factor for desired distance, *s, 50cm/s gives desired distance of 25cm
   
-  //command motor to fix distancing, convert to PWM, estimate current velocity from that
-    float commandedV = estimatedV + (distdes - cmnew)*k_ed
-    byte motorPWM = pwm0 + c_p*commandedV;
-    cmold= cmnew;
-    analogWrite(motorPin,motorPWM);
-    Serial.print(motorPWM);
-    Serial.print(" ");
-    estimatedV = constrain(0.6*(motorPWM - 50),10,120); // cm/sec
+//command motor to fix distancing, convert to PWM, estimate current velocity from that
+  float commandedV = estimatedV + (distdes - cmnew)*k_ed
+  byte motorPWM = pwm0 + c_p*commandedV;
+  cmold= cmnew;
+  analogWrite(motorPin,motorPWM);
+  Serial.print(motorPWM);
+  Serial.print(" ");
+  estimatedV = constrain(0.6*(motorPWM - 50),10,120); // cm/sec
   
-  //read in beta and offset, filter both
-  float betafiltered = 
-  float offsetfiltered =
+//read in betaimage and offset, filter both
+  //integrate and high-pass filter gyro, low-pass filter the camera beta
+  float betafiltered = beta
+  //low-pass filter the offset
+  float offsetfiltered = offset
     
-  //find delta from those
+//find delta from those
   float commandeddelta = k_beta*(k_off*(offsetdes - offsetfilt) - betafiltered) + servoBiasDeg;
   float servoAngleDeg = constrain(commandeddelta,servoBiasDeg-30,servoBiasDeg+30);
   steeringServo.write(servoAngleDeg);
   Serial.print(servoAngleDeg); Serial.print(" ");
   
   Serial.println();
-  delay(100); //how much delay?
 }
 
 
