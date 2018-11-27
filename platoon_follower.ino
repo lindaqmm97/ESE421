@@ -5,52 +5,59 @@
 #include <Servo.h>
 #include <SPI.h>
 #include <SD.h>
+#include <Wire.h>
+#include <Adafruit_LSM9DS1.h>
+#include <Adafruit_Sensor.h>
 
-#define servoPin 7 // pin for servo signal
-#define rcSteeringPin 25
-#define rcThrottlePin 23
-#define rcGrndPin 27
-#define sdSelectPin 49
-#define motorPin 8 // PWM for motor
 #define SLAVE_ADDRESS 0x04
-//
-// LSM9DS1 9-DOF with I2C
-//
+#define servoPin 7 // pin for servo signal
+#define motorPin 8 // PWM for motor
+#define pingTrigPin 23 // ping sensor trigger pin (output from Arduino)
+#define pingEchoPin 25 // ping sensor echo pin (input to Arduino)
+#define pingGrndPin 27 // ping sensor ground pin (use digital pin as ground)
+float cmold = 0;
+int offsetdes = 0;
+
 Adafruit_LSM9DS1 lsm = Adafruit_LSM9DS1();
 #define LSM9DS1_SCK 52  //BDK-mega
 #define LSM9DS1_MISO 50 //BDK-mega
 #define LSM9DS1_MOSI 51 //BDK-mega
 #define LSM9DS1_XGCS 49 //BDK-mega
 #define LSM9DS1_MCS 47 //BDK-mega
-//
+
 // servo
-//
 Servo steeringServo;
 float servoBiasDeg = 80.0;
 
 float gpsPsi;
-float frontEndL = 0.15; //m
 float Pi = 3.1416;
 float widthcamera = 0.2; //units???
   byte betaimage = 20;
 //float headingconstant = 0.1
 float heading_est_degrees = 0;
 float offset_est = 0;
+float pingDistanceCM = 0; //m
+float timeRead=20; //[ms]
+float frontEndL = 0.15; //m
+int k_d = 0.5; //[s], converts leader speed to desired following distance, test this
+int k_ed = 0.7;
+int k_off = 0.7;
+int k_beta = 0.7
+//float headingconstant = 0.1;
+
 
 //motor contants
 float pwm0 = 150/255; //experimentally determine pwm0 for DC 
-float v_max = 5; //maximum safe velocity for car, [m/s]
+float v_max = 50; //maximum safe velocity for car, [cm/s]
 float c_accel = 30; //acceleration-to-PWM conversion, experiments needed [s], positive
 float c_p = 1/70; //DC motor constant, must be experimentally determined, [(m/s)/(PWM%)]
 float k_delta = -v_max/90; // [(m/s)/degree] ...no penalty at zero turn angle, max penalty at 90 degree turn
-float speed_estimate = 0; //how to derive this?
+float estimatedV = 0;
 
 //I2C
 byte piCommand;
 String value;
 String offset;
-
-
 
 
 void setup() {
@@ -82,21 +89,12 @@ void setup() {
        dataFile.close();
     }
 
-//
-//  set up the rc control pins
-//
-    pinMode(rcGrndPin,OUTPUT); digitalWrite(rcGrndPin,LOW);
-    pinMode(rcSteeringPin,INPUT);
-    pinMode(rcThrottlePin,INPUT);
-//
 //  make the motors not spin
-//
     pinMode(motorPin,OUTPUT);
     analogWrite(motorPin,0);
-//
+
 //  connect the steering servo
 //  send bias
-//
     steeringServo.attach(servoPin);
     steeringServo.write(servoBiasDeg);
 
@@ -109,90 +107,63 @@ void setup() {
 
 
 
-
-
-
-
-
-
 //////////////////////////////////////////////////////////////////
 void loop() {
-//
+
 // IMU
-//
   lsm.read();
   sensors_event_t a, m, g, temp;
   lsm.getEvent(&a, &m, &g, &temp); 
   Serial.print("AY: "); Serial.print(a.acceleration.y);
   Serial.print(" GyroZ: "); Serial.print(g.gyro.z); Serial.print(" ");
-//
-//pi will figure out and tell the distance to leader, 
-//arduino should figure out relative linear and angular velocities of leader, and replicate those with control
-//  read the RC commands
-//
-//    unsigned long rcThrottleT = 0;
-//    unsigned long rcSteeringT = 0;
-//    rcThrottleT = pulseIn(rcThrottlePin,HIGH);
-//    rcSteeringT = pulseIn(rcSteeringPin,HIGH);
-//    float rcThrottlePct = constrain((rcThrottleT-1000.0)/8.0,0.0,100.0);
-//    float rcSteeringPct = constrain((rcSteeringT-1500.0)/4.0,-100.0,100.0);
-//    Serial.print(rcThrottlePct); Serial.print(" ");
-//    Serial.print(rcSteeringPct); Serial.print(" ");
-//
-//  set motor command
-//  estimate the corresponding speed of the car
-//
+  
+//use ping to find distance
+  // establish variables for duration of the ping, and the distance result
+  // in inches and centimeters:
+  long duration, inches, cm;
 
-    float rcThrottlePct= ;
-    float rcSteeringPct= ;
-    byte motorPWM = constrain(2.5*rcThrottlePct,0,255);
+    // The PING))) is triggered by a HIGH pulse of 2 or more microseconds.
+    // Give a short LOW pulse beforehand to ensure a clean HIGH pulse:
+    pinMode(pingPin, OUTPUT);
+    digitalWrite(pingPin, LOW);
+    delayMicroseconds(2);
+    digitalWrite(pingPin, HIGH);
+    delayMicroseconds(5);
+    digitalWrite(pingPin, LOW);
+
+    // The same pin is used to read the signal from the PING))): a HIGH pulse
+    // whose duration is the time (in microseconds) from the sending of the ping
+    // to the reception of its echo off of an object.
+    pinMode(pingPin, INPUT);
+    duration = pulseIn(pingPin, HIGH);
+
+    // convert the time into a distance
+    float cmnew = microsecondsToCentimeters(duration);
+  
+  //use current estimated speed, timestep, and  distance difference to estimate leader speed
+    float leaderV = estimatedV+(cmnew-cmold)/timestep;
+    float distdes = k_d*leaderV; //scale factor for desired distance, *s, 50cm/s gives desired distance of 25cm
+  
+  //command motor to fix distancing, convert to PWM, estimate current velocity from that
+    float commandedV = estimatedV + (distdes - cmnew)*k_ed
+    byte motorPWM = pwm0 + c_p*commandedV;
+    cmold= cmnew;
     analogWrite(motorPin,motorPWM);
     Serial.print(motorPWM);
     Serial.print(" ");
-    float estimatedV = constrain(0.6*(motorPWM - 50),10,120); // cm/sec
-//
-//  generate a commanded response--how fast do we want the car to turn
-//  estimate the control required to make it turn that fast
-//
-    float commandedPsiDot = 0.7*rcSteeringPct;  // desired turn rate in deg/sec
-    float servoEstimateDeg = commandedPsiDot*(17.0/estimatedV); // feed-forward steering to get desired turn rate
-//
-//  psi_error = washout of integrated yaw rate error
-//  (also, reset when car not moving so you can pick up and rotate)
-//
-    static float psi_error = 0.0;
-    static float millisLast = millis();
-    float tauPsi = 2.0; // washout time constant, in seconds
-    psi_error += (-(1/tauPsi)*psi_error + (commandedPsiDot + g.gyro.z))*(millis() - millisLast)*0.001;
-    millisLast = millis();
-    psi_error = constrain(psi_error,-10,10); // don't let the heading error get too big -- it might cause problems
-    if (rcThrottlePct < 5) psi_error = 0.0; // reset the heading error when we aren't moving
-    Serial.print(psi_error); Serial.print(" , ");
-
-    float Kpsi = 2.0;
-    float servoAngleDeg = constrain(servoBiasDeg+servoEstimateDeg+Kpsi*psi_error,servoBiasDeg-30,servoBiasDeg+30);
-    steeringServo.write(servoAngleDeg);
-    Serial.print(servoAngleDeg); Serial.print(" ");
-//
-//  log the data if throttle is on
-//
-    if (rcThrottlePct > 5) {
-        File dataFile = SD.open("leadCar.csv", FILE_WRITE);
-        if (dataFile) {
-           dataFile.print(millis()); dataFile.print(" , ");
-           dataFile.print(g.gyro.z); dataFile.print(" , ");
-           dataFile.print(a.acceleration.y); dataFile.print(" , ");
-           dataFile.print(rcThrottlePct); dataFile.print(" , ");
-           dataFile.print(rcSteeringPct); dataFile.print(" , ");
-           dataFile.print(motorPWM); dataFile.print(" , ");
-           dataFile.println(servoAngleDeg);
-           dataFile.close();
-        }
-    }
-//
-//  finish the dump of information to the Serial monitor
-//
-    Serial.println();
+    estimatedV = constrain(0.6*(motorPWM - 50),10,120); // cm/sec
+  
+  //read in beta and offset, filter both
+  float betafiltered = 
+  float offsetfiltered =
+    
+  //find delta from those
+  float commandeddelta = k_beta*(k_off*(offsetdes - offsetfilt) - betafiltered) + servoBiasDeg;
+  float servoAngleDeg = constrain(commandeddelta,servoBiasDeg-30,servoBiasDeg+30);
+  steeringServo.write(servoAngleDeg);
+  Serial.print(servoAngleDeg); Serial.print(" ");
+  
+  Serial.println();
 //
 //  reading the RC commands will cause effective pause of 20+ ms
 //  so we don't really need a pause here...
@@ -255,4 +226,11 @@ void sendDataI2C(void) {
         Wire.write((byte*) &dataBuffer[0], 3*sizeof(float));
     }
 
+}
+
+long microsecondsToCentimeters(long microseconds) {
+  // The speed of sound is 340 m/s or 29 microseconds per centimeter.
+  // The ping travels out and back, so to find the distance of the object we
+  // take half of the distance travelled.
+  return microseconds / 29 / 2;
 }
