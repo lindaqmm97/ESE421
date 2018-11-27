@@ -32,11 +32,8 @@ float servoBiasDeg = 80.0;
 float gpsPsi;
 float Pi = 3.1416;
 float widthcamera = 0.2; //units???
-  byte betaimage = 20;
-//float headingconstant = 0.1
-float heading_est_degrees = 0;
-float offset_est = 0;
-float pingDistanceCM = 0; //m
+byte betaimage = 20;    //how to read in???
+byte offsetimage = 0;
 float timeRead=20; //[ms]
 float frontEndL = 0.15; //m
 int k_d = 0.5; //[s], converts leader speed to desired following distance, test this
@@ -141,7 +138,7 @@ void loop() {
     float cmnew = microsecondsToCentimeters(duration);
   
   //use current estimated speed, timestep, and  distance difference to estimate leader speed
-    float leaderV = estimatedV+(cmnew-cmold)/timestep;
+    float leaderV = estimatedV+(cmnew-cmold)/timeRead;
     float distdes = k_d*leaderV; //scale factor for desired distance, *s, 50cm/s gives desired distance of 25cm
   
   //command motor to fix distancing, convert to PWM, estimate current velocity from that
