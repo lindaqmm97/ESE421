@@ -39,7 +39,9 @@ float frontEndL = 0.15; //m
 int k_d = 0.5; //[s], converts leader speed to desired following distance, test this
 int k_ed = 0.7; //distance error control
 int k_off = 0.7; //offset control
-int k_beta = 0.7  //beta control
+int k_beta = 0.7;  //beta control
+int tauPing = 0;
+int tauCam = 0;
 
 //motor contants
 float pwm0 = 100/255; //experimentally determine pwm0 for DC 
@@ -126,15 +128,23 @@ void loop() {
   duration = pulseIn(pingPin, HIGH);
   // convert the time into a distance
   float cmnew = microsecondsToCentimeters(duration);
-  
+  // if cmnew reads something weird, disregard it and use the camera value?
+  //high pass filter both camera and ping and then average them?
+  distance = cmnew; //(for now)
+      
+      
 //use current estimated speed, timestep, and  distance difference to estimate leader speed
-  float leaderV = estimatedV+(cmnew-cmold)/timeRead;
+  float leaderV = estimatedV+(distnew-distold)/timeRead;
   float distdes = k_d*leaderV; //scale factor for desired distance, *s, 50cm/s gives desired distance of 25cm
+//Emergencystop  
+    if (distnew <= distdes){
+        analogWrite(motorPin,0);
+  }
   
 //command motor to fix distancing, convert to PWM, estimate current velocity from that
   float commandedV = estimatedV + (distdes - cmnew)*k_ed
   byte motorPWM = pwm0 + c_p*commandedV;
-  cmold= cmnew;
+  distold= distnew;
   analogWrite(motorPin,motorPWM);
   Serial.print(motorPWM);
   Serial.print(" ");
