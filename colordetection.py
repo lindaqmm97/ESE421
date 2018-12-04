@@ -61,4 +61,28 @@ for (lower, upper) in boundaries:
 #    print(centerX)
 #   print(centerY)
 #    print(width)
+
+#calculate distance from centroid location
+focal_length = .304 #cm
+field_of_view = 48.8 #degrees
+resolution = 2464 #pixels
+self.pix2dist = (focal_length * tan(pi/180*field_of_view/2)) / (resolution / 2)
+points = [centerX, centerY]; 
+def transform(self,points,planeN=[0,0,1],planeT=[0,0,0]):
+if points is None:
+return None
+planeN = np.reshape(planeN,(3,))
+planeT = np.reshape(planeT,(3,))
+output = []
+if type(points) != list and type(points) != tuple:
+points = [points]
+for point in points:
+point = np.reshape(point,(2,))
+point = np.concatenate(([self.camFocal], point * self.pix2dist), axis=0)
+point = self.camR @ point # rotate to the world frame
+c = (-np.dot(self.camT,planeN) + np.dot(planeT,planeN)) / np.dot(point,planeN)
+transformed = c * point + self.camT
+output.append(transformed)
+return output
+
     cv2.waitKey(2)
