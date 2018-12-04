@@ -83,6 +83,6 @@ point = self.camR @ point # rotate to the world frame
 c = (-np.dot(self.camT,planeN) + np.dot(planeT,planeN)) / np.dot(point,planeN)
 transformed = c * point + self.camT
 output.append(transformed)
-return output
+cameradistance = output
 
     cv2.waitKey(2)
